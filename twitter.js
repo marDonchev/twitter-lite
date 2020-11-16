@@ -30,6 +30,7 @@ const defaults = {
   access_token_secret: null,
   bearer_token: null,
   version: '1.1',
+  extension: true,
 };
 
 // Twitter expects POST body parameters to be URL-encoded: https://developer.twitter.com/en/docs/basics/authentication/guides/creating-a-signature
@@ -79,39 +80,42 @@ class Twitter {
   }
 
   /**
-   * Parse the JSON from a Response object and add the Headers under `_headers`
-   * @param {Response} response - the Response object returned by Fetch
-   * @return {Promise<object>}
-   * @private
-   */
+     * Parse the JSON from a Response object and add the Headers under `_headers`
+     * @param {Response} response - the Response object returned by Fetch
+     * @return {Promise<object>}
+     * @private
+     */
   static async _handleResponse(response) {
     const headers = response.headers; // TODO: see #44
     if (response.ok) {
       // Return empty response on 204 "No content", or Content-Length=0
-      if (response.status === 204 || response.headers.get('content-length') === '0')
+      if (
+        response.status === 204 ||
+                response.headers.get('content-length') === '0'
+      )
         return {
           _headers: headers,
         };
       // Otherwise, parse JSON response
-      return response.json().then(res => {
+      return response.json().then((res) => {
         res._headers = headers; // TODO: this creates an array-like object when it adds _headers to an array response
         return res;
       });
     } else {
       throw {
         _headers: headers,
-        ...await response.json(),
+        ...(await response.json()),
       };
     }
   }
 
   /**
-   * Resolve the TEXT parsed from the successful response or reject the JSON from the error
-   * @param {Response} response - the Response object returned by Fetch
-   * @return {Promise<object>}
-   * @throws {Promise<object>}
-   * @private
-   */
+     * Resolve the TEXT parsed from the successful response or reject the JSON from the error
+     * @param {Response} response - the Response object returned by Fetch
+     * @return {Promise<object>}
+     * @throws {Promise<object>}
+     * @private
+     */
   static async _handleResponseTextOrJson(response) {
     let body = await response.text();
     if (response.ok) {
@@ -132,10 +136,10 @@ class Twitter {
   async getBearerToken() {
     const headers = {
       Authorization:
-        'Basic ' +
-        Buffer.from(
-          this.config.consumer_key + ':' + this.config.consumer_secret,
-        ).toString('base64'),
+                'Basic ' +
+                Buffer.from(
+                  this.config.consumer_key + ':' + this.config.consumer_secret,
+                ).toString('base64'),
       'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
     };
 
@@ -155,8 +159,10 @@ class Twitter {
     };
 
     let parameters = {};
-    if (twitterCallbackUrl) parameters = { oauth_callback: twitterCallbackUrl };
-    if (parameters) requestData.url += '?' + querystring.stringify(parameters);
+    if (twitterCallbackUrl)
+      parameters = { oauth_callback: twitterCallbackUrl };
+    if (parameters)
+      requestData.url += '?' + querystring.stringify(parameters);
 
     const headers = this.client.toHeader(
       this.client.authorize(requestData, {}),
@@ -165,8 +171,7 @@ class Twitter {
     const results = await Fetch(requestData.url, {
       method: 'POST',
       headers: Object.assign({}, baseHeaders, headers),
-    })
-      .then(Twitter._handleResponseTextOrJson);
+    }).then(Twitter._handleResponseTextOrJson);
 
     return results;
   }
@@ -177,31 +182,38 @@ class Twitter {
       method: 'POST',
     };
 
-    let parameters = { oauth_verifier: options.oauth_verifier, oauth_token: options.oauth_token };
-    if (parameters.oauth_verifier && parameters.oauth_token) requestData.url += '?' + querystring.stringify(parameters);
+    let parameters = {
+      oauth_verifier: options.oauth_verifier,
+      oauth_token: options.oauth_token,
+    };
+    if (parameters.oauth_verifier && parameters.oauth_token)
+      requestData.url += '?' + querystring.stringify(parameters);
 
-    const headers = this.client.toHeader( this.client.authorize(requestData) );
+    const headers = this.client.toHeader(
+      this.client.authorize(requestData),
+    );
 
     const results = await Fetch(requestData.url, {
       method: 'POST',
       headers: Object.assign({}, baseHeaders, headers),
-    })
-      .then(Twitter._handleResponseTextOrJson);
+    }).then(Twitter._handleResponseTextOrJson);
 
     return results;
   }
 
   /**
-   * Construct the data and headers for an authenticated HTTP request to the Twitter API
-   * @param {string} method - 'GET' or 'POST'
-   * @param {string} resource - the API endpoint
-   * @param {object} parameters
-   * @return {{requestData: {url: string, method: string}, headers: ({Authorization: string}|OAuth.Header)}}
-   * @private
-   */
+     * Construct the data and headers for an authenticated HTTP request to the Twitter API
+     * @param {string} method - 'GET' or 'POST'
+     * @param {string} resource - the API endpoint
+     * @param {object} parameters
+     * @return {{requestData: {url: string, method: string}, headers: ({Authorization: string}|OAuth.Header)}}
+     * @private
+     */
   _makeRequest(method, resource, parameters) {
     const requestData = {
-      url: `${this.url}/${resource}.json`,
+      url: `${this.url}/${resource}${
+        this.config.extension ? '.json' : ''
+      }`,
       method,
     };
     if (parameters)
@@ -225,12 +237,12 @@ class Twitter {
   }
 
   /**
-   * Send a GET request
-   * @param {string} resource - endpoint, e.g. `followers/ids`
-   * @param {object} [parameters] - optional parameters
-   * @returns {Promise<object>} Promise resolving to the response from the Twitter API.
-   *   The `_header` property will be set to the Response headers (useful for checking rate limits)
-   */
+     * Send a GET request
+     * @param {string} resource - endpoint, e.g. `followers/ids`
+     * @param {object} [parameters] - optional parameters
+     * @returns {Promise<object>} Promise resolving to the response from the Twitter API.
+     *   The `_header` property will be set to the Response headers (useful for checking rate limits)
+     */
   get(resource, parameters) {
     const { requestData, headers } = this._makeRequest(
       'GET',
@@ -238,18 +250,19 @@ class Twitter {
       parameters,
     );
 
-    return Fetch(requestData.url, { headers })
-      .then(Twitter._handleResponse);
+    return Fetch(requestData.url, { headers }).then(
+      Twitter._handleResponse,
+    );
   }
 
   /**
-   * Send a POST request
-   * @param {string} resource - endpoint, e.g. `users/lookup`
-   * @param {object} body - POST parameters object.
-   *   Will be encoded appropriately (JSON or urlencoded) based on the resource
-   * @returns {Promise<object>} Promise resolving to the response from the Twitter API.
-   *   The `_header` property will be set to the Response headers (useful for checking rate limits)
-   */
+     * Send a POST request
+     * @param {string} resource - endpoint, e.g. `users/lookup`
+     * @param {object} body - POST parameters object.
+     *   Will be encoded appropriately (JSON or urlencoded) based on the resource
+     * @returns {Promise<object>} Promise resolving to the response from the Twitter API.
+     *   The `_header` property will be set to the Response headers (useful for checking rate limits)
+     */
   post(resource, body) {
     const { requestData, headers } = this._makeRequest(
       'POST',
@@ -269,17 +282,16 @@ class Twitter {
       method: 'POST',
       headers: postHeaders,
       body,
-    })
-      .then(Twitter._handleResponse);
+    }).then(Twitter._handleResponse);
   }
 
   /**
-   * Send a PUT request 
-   * @param {string} resource - endpoint e.g. `direct_messages/welcome_messages/update`
-   * @param {object} parameters - required or optional query parameters
-   * @param {object} body - PUT request body 
-   * @returns {Promise<object>} Promise resolving to the response from the Twitter API.
-   */
+     * Send a PUT request
+     * @param {string} resource - endpoint e.g. `direct_messages/welcome_messages/update`
+     * @param {object} parameters - required or optional query parameters
+     * @param {object} body - PUT request body
+     * @returns {Promise<object>} Promise resolving to the response from the Twitter API.
+     */
   put(resource, parameters, body) {
     const { requestData, headers } = this._makeRequest(
       'PUT',
@@ -294,16 +306,15 @@ class Twitter {
       method: 'PUT',
       headers: putHeaders,
       body,
-    })
-      .then(Twitter._handleResponse);
+    }).then(Twitter._handleResponse);
   }
 
   /**
-   *
-   * @param {string} resource - endpoint, e.g. `statuses/filter`
-   * @param {object} parameters
-   * @returns {Stream}
-   */
+     *
+     * @param {string} resource - endpoint, e.g. `statuses/filter`
+     * @param {object} parameters
+     * @returns {Stream}
+     */
   stream(resource, parameters) {
     if (this.authType !== 'User')
       throw new Error('Streams require user context authentication');
@@ -313,7 +324,9 @@ class Twitter {
     // POST the request, in order to accommodate long parameter lists, e.g.
     // up to 5000 ids for statuses/filter - https://developer.twitter.com/en/docs/tweets/filter-realtime/api-reference/post-statuses-filter
     const requestData = {
-      url: `${getUrl('stream')}/${resource}.json`,
+      url: `${getUrl('stream')}/${resource}${
+        this.config.extension ? '.json' : ''
+      }`,
       method: 'POST',
     };
     if (parameters) requestData.data = parameters;
@@ -332,22 +345,23 @@ class Twitter {
     });
 
     request
-      .then(response => {
-        stream.destroy = this.stream.destroy = () => response.body.destroy();
+      .then((response) => {
+        stream.destroy = this.stream.destroy = () =>
+          response.body.destroy();
 
         if (response.ok) {
           stream.emit('start', response);
         } else {
-          response._headers = response.headers;  // TODO: see #44 - could omit the line
+          response._headers = response.headers; // TODO: see #44 - could omit the line
           stream.emit('error', response);
         }
 
         response.body
-          .on('data', chunk => stream.parse(chunk))
-          .on('error', error => stream.emit('error', error))  // no point in adding the original response headers
+          .on('data', (chunk) => stream.parse(chunk))
+          .on('error', (error) => stream.emit('error', error)) // no point in adding the original response headers
           .on('end', () => stream.emit('end', response));
       })
-      .catch(error => stream.emit('error', error));
+      .catch((error) => stream.emit('error', error));
 
     return stream;
   }
